@@ -4,6 +4,10 @@ use App\Modules\ModuloOperacionCitas\Controllers\AsistenciaController;
 use App\Modules\ModuloOperacionCitas\Controllers\CitaController;
 use App\Modules\ModuloOperacionCitas\Controllers\ModalidadController;
 use Illuminate\Support\Facades\Route;
+use App\Modules\ModuloOperacionCitas\Controllers\AgendaController;
+use App\Modules\ModuloOperacionCitas\Controllers\ConsultaController;
+use App\Modules\ModuloOperacionCitas\Controllers\PagoController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -29,3 +33,12 @@ Route::middleware(['auth:sanctum', 'permiso:asistencia_registrar'])->whereNumber
     Route::get('asistencia', [AsistenciaController::class, 'index']);
     Route::patch('citas/{cita}/asistencia', [AsistenciaController::class, 'cambiarEstado']);
 });
+
+// CU16 – Consultar Agenda Médica (Accesible para Recepcionista y Médico)
+Route::get('agenda', [AgendaController::class, 'index'])->middleware(['auth:sanctum']);
+
+// CU17 – Registrar Consulta Médica (Solo médicos con el permiso)
+Route::post('consultas', [ConsultaController::class, 'store'])->middleware(['auth:sanctum', 'permiso:citas_atender']);
+
+// CU24 – Gestionar Pasarela de Pago (Solo usuarios autenticados)
+Route::post('pagos', [PagoController::class, 'store'])->middleware(['auth:sanctum']);

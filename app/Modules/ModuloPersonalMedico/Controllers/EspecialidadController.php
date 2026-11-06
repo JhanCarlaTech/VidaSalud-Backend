@@ -38,6 +38,24 @@ class EspecialidadController extends Controller
     }
 
     /**
+     * GET /api/publico/especialidades (sin sesión): catálogo activo para la
+     * reserva en línea de la página principal, con el precio de la consulta.
+     */
+    public function publicas(): JsonResponse
+    {
+        $especialidades = $this->especialidades->listar(null, true)
+            ->map(fn (Especialidad $especialidad) => [
+                'id' => $especialidad->id,
+                'nombre' => $especialidad->nombre,
+                'descripcion' => $especialidad->descripcion,
+                'precio_consulta' => (float) $especialidad->precio_consulta,
+                'medicos_activos' => $especialidad->medicos_count,
+            ]);
+
+        return ApiResponse::exito($especialidades, 'Especialidades de la clínica.');
+    }
+
+    /**
      * POST /api/especialidades
      */
     public function store(EspecialidadRequest $request): JsonResponse

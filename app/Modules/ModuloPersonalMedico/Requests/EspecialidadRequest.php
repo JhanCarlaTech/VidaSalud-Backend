@@ -36,6 +36,7 @@ class EspecialidadRequest extends FormRequest
                 new UnicoSinMayusculas('especialidad', 'nombre', 'Ya existe una especialidad con ese nombre.', $this->route('especialidad')?->id),
             ],
             'descripcion' => ['nullable', 'string', 'max:500'],
+            'precio_consulta' => ['required', 'numeric', 'min:0', 'max:99999.99', 'decimal:0,2'],
         ];
     }
 
@@ -45,7 +46,12 @@ class EspecialidadRequest extends FormRequest
             'nombre.required' => 'El nombre de la especialidad es obligatorio.',
             'nombre.max' => 'El nombre no puede superar los 100 caracteres.',
             'nombre.regex' => 'El nombre solo puede contener letras y espacios.',
-            'descripcion.max' => 'La descripción no puede superar los 500 caracteres.',
+            'precio_consulta.required' => 'Indique el precio de la consulta.',
+            'precio_consulta.numeric' => 'El precio debe ser un número.',
+            'precio_consulta.min' => 'El precio no puede ser negativo.',
+            'precio_consulta.max' => 'El precio no puede superar Bs 99.999,99.',
+            'precio_consulta.decimal' => 'El precio admite como máximo dos decimales.',
+            'descripcion.max' =>'La descripción no puede superar los 500 caracteres.',
         ];
     }
 }

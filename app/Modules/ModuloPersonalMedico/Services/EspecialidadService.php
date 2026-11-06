@@ -39,7 +39,7 @@ class EspecialidadService
     public function crear(array $datos, Usuario $actor): Especialidad
     {
         return DB::transaction(function () use ($datos, $actor) {
-            $especialidad = Especialidad::create(Arr::only($datos, ['nombre', 'descripcion']));
+            $especialidad = Especialidad::create(Arr::only($datos, ['nombre', 'descripcion', 'precio_consulta']));
             $especialidad->refresh(); // Trae 'activo' por defecto de la BD.
 
             $this->bitacora->registrar('INSERT', 'especialidad', $actor->id, datosNuevos: $this->instantanea($especialidad));
@@ -53,7 +53,7 @@ class EspecialidadService
         return DB::transaction(function () use ($especialidad, $datos, $actor) {
             $antes = $this->instantanea($especialidad);
 
-            $especialidad->update(Arr::only($datos, ['nombre', 'descripcion']));
+            $especialidad->update(Arr::only($datos, ['nombre', 'descripcion', 'precio_consulta']));
 
             $this->bitacora->registrar('UPDATE', 'especialidad', $actor->id, $antes, $this->instantanea($especialidad));
 
@@ -103,6 +103,6 @@ class EspecialidadService
      */
     private function instantanea(Especialidad $especialidad): array
     {
-        return Arr::only($especialidad->attributesToArray(), ['id', 'nombre', 'descripcion', 'activo']);
+        return Arr::only($especialidad->attributesToArray(), ['id', 'nombre', 'descripcion', 'precio_consulta', 'activo']);
     }
 }

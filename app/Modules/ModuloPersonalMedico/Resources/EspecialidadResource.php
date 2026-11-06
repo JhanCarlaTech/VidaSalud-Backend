@@ -16,6 +16,7 @@ class EspecialidadResource extends JsonResource
             'id' => $this->id,
             'nombre' => $this->nombre,
             'descripcion' => $this->descripcion,
+            'precio_consulta' => (float) $this->precio_consulta,
             'activo' => $this->activo,
             'medicos_activos' => $this->whenCounted('medicos'),
             'medicos' => $this->whenLoaded('medicos', fn () => $this->medicos

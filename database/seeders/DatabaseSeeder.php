@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Modules\ModuloPersonalMedico\Models\Especialidad;
 use App\Modules\ModuloSeguridad\Models\Rol;
 use App\Shared\Support\ScriptSqlClinico;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -37,6 +38,11 @@ class DatabaseSeeder extends Seeder
 
         DB::transaction(function () use ($correoAdmin, $contrasenaAdmin) {
             DB::unprepared(ScriptSqlClinico::datosIniciales());
+
+            // El script no incluye el precio de la consulta (se agregó para CU24).
+            foreach (Especialidad::PRECIOS_INICIALES as $nombre => $precio) {
+                DB::table('especialidad')->where('nombre', $nombre)->update(['precio_consulta' => $precio]);
+            }
 
             // El hash escrito en el script no es un BCRYPT válido (59 caracteres),
             // por lo que se regenera con el hasher de Laravel.

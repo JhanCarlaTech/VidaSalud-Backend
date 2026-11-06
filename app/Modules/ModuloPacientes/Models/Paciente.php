@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -46,6 +47,16 @@ class Paciente extends Model
         return $this->hasMany(CitaMedica::class, 'id_paciente')
             ->whereIn('estado', CitaMedica::ESTADOS_PENDIENTES)
             ->whereDate('fecha', '>=', today());
+    }
+
+    /**
+     * Antecedentes patológicos del paciente (CU12). La tabla 'paciente_enfermedad'
+     * tiene clave compuesta, por eso se gestiona como relación de pivote.
+     */
+    public function enfermedades(): BelongsToMany
+    {
+        return $this->belongsToMany(Enfermedad::class, 'paciente_enfermedad', 'id_paciente', 'id_enfermedad')
+            ->withPivot(['fecha_diagnostico', 'observaciones']);
     }
 
     /** Edad en años cumplidos (RN03: se calcula, no se guarda). */

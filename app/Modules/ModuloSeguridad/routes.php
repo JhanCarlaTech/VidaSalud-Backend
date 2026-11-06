@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\ModuloSeguridad\Controllers\AuthController;
+use App\Modules\ModuloSeguridad\Controllers\BitacoraController;
+use App\Modules\ModuloSeguridad\Controllers\ImportUsuarioController;
 use App\Modules\ModuloSeguridad\Controllers\PerfilController;
 use App\Modules\ModuloSeguridad\Controllers\PermisoController;
 use App\Modules\ModuloSeguridad\Controllers\RolController;
@@ -41,6 +43,21 @@ Route::middleware(['auth:sanctum', 'permiso:usuarios_gestionar'])->group(functio
     Route::get('usuarios/{usuario}', [UsuarioController::class, 'show'])->whereNumber('usuario');
     Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->whereNumber('usuario');
     Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'cambiarEstado'])->whereNumber('usuario');
+});
+
+// CU04 – Cargar Usuarios por Lotes (CSV)
+Route::prefix('importaciones')->middleware(['auth:sanctum', 'permiso:usuarios_importar'])->group(function () {
+    Route::get('plantilla', [ImportUsuarioController::class, 'plantilla']);
+    Route::post('validar', [ImportUsuarioController::class, 'validar']);
+    Route::post('/', [ImportUsuarioController::class, 'importar']);
+});
+
+// CU06 – Consultar Bitácora de Auditoría (solo lectura: no hay rutas para modificarla)
+Route::prefix('bitacora')->middleware(['auth:sanctum', 'permiso:bitacora_consultar'])->group(function () {
+    Route::get('/', [BitacoraController::class, 'index']);
+    Route::get('catalogo', [BitacoraController::class, 'catalogo']);
+    Route::get('exportar', [BitacoraController::class, 'exportar']);
+    Route::get('{bitacora}', [BitacoraController::class, 'show'])->whereNumber('bitacora');
 });
 
 // CU03 – Gestionar Roles y Asignar Permisos

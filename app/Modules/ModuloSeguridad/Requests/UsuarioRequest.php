@@ -9,11 +9,15 @@ use Illuminate\Validation\Rule;
 /**
  * Reglas comunes para crear y modificar usuarios (CU02, excepciones E1–E2).
  * La autorización la realiza el middleware 'permiso:usuarios_gestionar'.
+ * Las reglas y mensajes también los usa la carga masiva (CU04), por eso se exponen como métodos estáticos.
  */
 abstract class UsuarioRequest extends FormRequest
 {
-    /** RN02: mínimo 8 caracteres con letras y números (72 es el límite de BCRYPT). Se reutiliza en CU05. */
-    public const REGLAS_CONTRASENA =['string', 'min:8', 'max:72', 'regex:/^(?=.*[A-Za-z])(?=.*\d).+$/', 'confirmed'];
+    /** RN02: mínimo 8 caracteres con letras y números (72 es el límite de BCRYPT). */
+    public const POLITICA_CONTRASENA = ['string', 'min:8', 'max:72', 'regex:/^(?=.*[A-Za-z])(?=.*\d).+$/'];
+
+    /** Política más confirmación: formularios de CU02, CU05, CU08 y CU11. */
+    public const REGLAS_CONTRASENA = [...self::POLITICA_CONTRASENA, 'confirmed'];
 
     /**
      * ID del usuario a ignorar en las reglas de unicidad (null al crear).
@@ -27,33 +31,58 @@ abstract class UsuarioRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'ci' => trim((string) $this->input('ci')),
-            'nombre' => trim((string) $this->input('nombre')),
-            'apellido' => trim((string) $this->input('apellido')),
-            'correo' => Str::lower(trim((string) $this->input('correo'))),
-            'telefono' => $this->filled('telefono') ? trim((string) $this->input('telefono')) : null,
-            'sexo' => $this->filled('sexo') ? $this->input('sexo') : null,
-        ]);
+        $this->merge(self::normalizarCuenta($this->all()));
+    }
+
+    /**
+     * Recorta los datos de la cuenta y deja el correo en minúsculas; teléfono y sexo vacíos pasan a null.
+     */
+    public static function normalizarCuenta(array $entrada): array
+    {
+        $texto = fn (string $campo) => trim((string) ($entrada[$campo] ?? ''));
+
+        return [
+            'ci' => $texto('ci'),
+            'nombre' => $texto('nombre'),
+            'apellido' => $texto('apellido'),
+            'correo' => Str::lower($texto('correo')),
+            'telefono' => $texto('telefono') !== '' ? $texto('telefono') : null,
+            'sexo' => filled($entrada['sexo'] ?? null) ? $entrada['sexo'] : null,
+        ];
     }
 
     protected function reglasDatosPersonales(): array
     {
-        $id = $this->idUsuarioActual();
-
         return [
-            'ci' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z-]+$/', Rule::unique('usuario', 'ci')->ignore($id)],
-            'nombre' => ['required', 'string', 'max:100'],
-            'apellido' => ['required', 'string', 'max:100'],
-            'correo' => ['required', 'email', 'max:150', Rule::unique('usuario', 'correo')->ignore($id)],
-            'telefono' => ['nullable', 'string', 'regex:/^[0-9+\-\s]{6,20}$/'],
-            'sexo' => ['nullable', Rule::in(['M', 'F', 'O'])],
+            ...self::reglasCuenta($this->idUsuarioActual()),
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['integer', 'distinct', Rule::exists('rol', 'id')->where('activo', true)],
         ];
     }
 
+    /**
+     * Datos personales de la cuenta, con CI y correo únicos (RN01).
+     *
+     * @param  int|null  $idIgnorar  Usuario que se está modificando (null al crear).
+     */
+    public static function reglasCuenta(?int $idIgnorar = null): array
+    {
+        return [
+            'ci' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z-]+$/', Rule::unique('usuario', 'ci')->ignore($idIgnorar)],
+            'nombre' => ['required', 'string', 'max:100'],
+            'apellido' => ['required', 'string', 'max:100'],
+            'correo' => ['required', 'email', 'max:150', Rule::unique('usuario', 'correo')->ignore($idIgnorar)],
+            'telefono' => ['nullable', 'string', 'regex:/^[0-9+\-\s]{6,20}$/'],
+            'sexo' => ['nullable', Rule::in(['M', 'F', 'O'])],
+        ];
+    }
+
     public function messages(): array
+    {
+        return self::mensajesCuenta();
+    }
+
+    public static function mensajesCuenta(): array
     {
         return [
             'ci.required' => 'El CI es obligatorio.',

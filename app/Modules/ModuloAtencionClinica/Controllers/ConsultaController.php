@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Modules\ModuloOperacionCitas\Controllers;
+namespace App\Modules\ModuloAtencionClinica\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\ModuloOperacionCitas\Requests\ConsultaRequest;
-use App\Modules\ModuloOperacionCitas\Services\ConsultaService;
+use App\Modules\ModuloAtencionClinica\Requests\ConsultaRequest;
+use App\Modules\ModuloAtencionClinica\Resources\ConsultaResource;
+use App\Modules\ModuloAtencionClinica\Services\ConsultaService;
 use App\Shared\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -22,8 +23,8 @@ class ConsultaController extends Controller
      */
     public function store(ConsultaRequest $request): JsonResponse
     {
-        $consulta = $this->consultas->registrar($request->validated(), $request->user()->id);
+        $consulta = $this->consultas->registrar($request->validated(), $request->user());
 
-        return ApiResponse::exito($consulta, 'Consulta médica registrada correctamente.', 201);
+        return ApiResponse::exito(new ConsultaResource($consulta), 'Consulta médica registrada correctamente.', 201);
     }
 }

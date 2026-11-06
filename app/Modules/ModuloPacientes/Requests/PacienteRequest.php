@@ -24,15 +24,30 @@ abstract class PacienteRequest extends UsuarioRequest
     {
         return [
             ...Arr::except($this->reglasDatosPersonales(), ['roles', 'roles.*']),
-            'fecha_nacimiento' => ['required', 'date_format:Y-m-d', 'before:today', 'after:1900-01-01'],
-            ...self::reglasFichaMedica(),
+            ...self::reglasDatosPaciente(),
         ];
     }
 
     public function messages(): array
     {
+        return [...parent::messages(), ...self::mensajesPaciente()];
+    }
+
+    /**
+     * Fecha de nacimiento (RN03), tipo de sangre y contacto de emergencia.
+     * También las usa la carga masiva de pacientes (CU04).
+     */
+    public static function reglasDatosPaciente(): array
+    {
         return [
-            ...parent::messages(),
+            'fecha_nacimiento' => ['required', 'date_format:Y-m-d', 'before:today', 'after:1900-01-01'],
+            ...self::reglasFichaMedica(),
+        ];
+    }
+
+    public static function mensajesPaciente(): array
+    {
+        return [
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'fecha_nacimiento.date_format' => 'La fecha de nacimiento debe tener el formato AAAA-MM-DD.',
             'fecha_nacimiento.before' => 'La fecha de nacimiento debe ser anterior a hoy.',

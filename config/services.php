@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    /*
+    | CU22 – Interpretación de consultas de reportes con IA (decisión D6).
+    | Sin clave, el sistema usa el intérprete por reglas: la funcionalidad no depende de la IA.
+    */
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'modelo' => env('ANTHROPIC_MODELO', 'claude-opus-5-5'),
+        'timeout' => (float) env('ANTHROPIC_TIMEOUT', 20),
+    ],
+
 ];

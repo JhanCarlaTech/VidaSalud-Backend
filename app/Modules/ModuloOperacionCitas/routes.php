@@ -5,7 +5,7 @@ use App\Modules\ModuloOperacionCitas\Controllers\CitaController;
 use App\Modules\ModuloOperacionCitas\Controllers\ModalidadController;
 use Illuminate\Support\Facades\Route;
 use App\Modules\ModuloOperacionCitas\Controllers\AgendaController;
-use App\Modules\ModuloOperacionCitas\Controllers\ConsultaController;
+use App\Modules\ModuloOperacionCitas\Controllers\MetodoPagoController;
 use App\Modules\ModuloOperacionCitas\Controllers\PagoController;
 
 
@@ -14,6 +14,9 @@ use App\Modules\ModuloOperacionCitas\Controllers\PagoController;
 | Módulo 4: Operación de Citas Médicas, Agenda y Pagos
 |--------------------------------------------------------------------------
 */
+
+// Reserva en línea desde la página principal (sin sesión): catálogo de modalidades.
+Route::get('publico/modalidades', [ModalidadController::class, 'index'])->middleware('throttle:60,1');
 
 // CU13 y CU14 – Quién actúa sobre qué cita (personal con 'citas_programar' o el
 // propio paciente) lo decide CitaController.
@@ -37,8 +40,8 @@ Route::middleware(['auth:sanctum', 'permiso:asistencia_registrar'])->whereNumber
 // CU16 – Consultar Agenda Médica (Accesible para Recepcionista y Médico)
 Route::get('agenda', [AgendaController::class, 'index'])->middleware(['auth:sanctum']);
 
-// CU17 – Registrar Consulta Médica (Solo médicos con el permiso)
-Route::post('consultas', [ConsultaController::class, 'store'])->middleware(['auth:sanctum', 'permiso:citas_atender']);
+// CU17 – Registrar Consulta Médica: ver app/Modules/ModuloAtencionClinica/routes.php
 
 // CU24 – Gestionar Pasarela de Pago (Solo usuarios autenticados)
 Route::post('pagos', [PagoController::class, 'store'])->middleware(['auth:sanctum']);
+Route::get('metodos-pago', [MetodoPagoController::class, 'index'])->middleware(['auth:sanctum']);

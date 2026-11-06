@@ -2,6 +2,8 @@
 
 namespace App\Modules\ModuloOperacionCitas\Services;
 
+use App\Modules\ModuloInteligenciaReportes\Models\Notificacion;
+use App\Modules\ModuloInteligenciaReportes\Services\NotificacionService;
 use App\Modules\ModuloOperacionCitas\Models\CitaMedica;
 use App\Modules\ModuloPacientes\Models\Paciente;
 use App\Modules\ModuloPersonalMedico\Models\HorarioAtencion;
@@ -16,7 +18,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * CU13 – Gestionar Citas Médicas y Modalidad.
@@ -40,7 +44,21 @@ class CitaService
     public function __construct(
         private readonly DisponibilidadService $disponibilidad,
         private readonly BitacoraService $bitacora,
+        private readonly NotificacionService $notificaciones,
     ) {}
+
+    /**
+     * CU20 RN02: avisa al paciente después de confirmar la operación. Un problema con
+     * el aviso nunca deshace ni hace fallar la cita: solo se registra en el log.
+     */
+    private function avisarPaciente(CitaMedica $cita, string $tipo, ?string $motivo = null): void
+    {
+        try {
+            $this->notificaciones->notificarCita($cita, $tipo, $motivo);
+        } catch (Throwable $error) {
+            Log::warning('No se pudo crear la notificación de la cita.', ['cita' => $cita->id, 'tipo' => $tipo, 'error' => $error->getMessage()]);
+        }
+    }
 
     /**
      * CU14: búsqueda de citas para el personal.
@@ -78,7 +96,7 @@ class CitaService
         $medico = $this->medicoQueEjerce($datos['id_medico'], $datos['id_especialidad']);
         $fecha = CarbonImmutable::createFromFormat('Y-m-d', $datos['fecha'])->startOfDay();
 
-        return $this->enTransaccionExclusiva(function () use ($datos, $paciente, $medico, $fecha, $actor) {
+        $cita = $this->enTransaccionExclusiva(function () use ($datos, $paciente, $medico, $fecha, $actor) {
             $turno = $this->turnoDisponible($medico, $fecha, $datos['hra_inicio']);
             $this->validarSinSuperposicion($paciente->id_usuario, $fecha, $turno);
 
@@ -103,6 +121,10 @@ class CitaService
 
             return $cita;
         });
+
+        $this->avisarPaciente($cita, Notificacion::CITA_AGENDADA);
+
+        return $cita;
     }
 
     /**
@@ -126,7 +148,7 @@ class CitaService
             throw ValidationException::withMessages(['hra_inicio' => 'Elija una fecha u hora distinta de la actual.']);
         }
 
-        return $this->enTransaccionExclusiva(function () use ($cita, $datos, $medico, $fecha, $actor) {
+        $cita = $this->enTransaccionExclusiva(function () use ($cita, $datos, $medico, $fecha, $actor) {
             $antes = $this->instantanea($cita);
 
             $turno = $this->turnoDisponible($medico, $fecha, $datos['hra_inicio']);
@@ -144,6 +166,10 @@ class CitaService
 
             return $cita;
         });
+
+        $this->avisarPaciente($cita, Notificacion::CITA_REPROGRAMADA);
+
+        return $cita;
     }
 
     /**
@@ -155,7 +181,7 @@ class CitaService
     {
         $this->validarModificable($cita, $esPersonal, 'cancelar');
 
-        return DB::transaction(function () use ($cita, $motivo, $actor) {
+        $cita = DB::transaction(function () use ($cita, $motivo, $actor) {
             $antes = $this->instantanea($cita);
 
             $cita->update(['estado' => CitaMedica::CANCELADA, 'motivo_cancelacion' => $motivo]);
@@ -168,6 +194,10 @@ class CitaService
 
             return $cita;
         });
+
+        $this->avisarPaciente($cita, Notificacion::CITA_CANCELADA, $motivo);
+
+        return $cita;
     }
 
     /**

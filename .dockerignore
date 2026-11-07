@@ -1,0 +1,35 @@
+# Secretos y configuración local: en Railway las variables se definen en el panel.
+.env
+.env.*
+!.env.example
+
+# Se instalan dentro de la imagen
+vendor
+node_modules
+
+# Archivos generados en la máquina local
+bootstrap/cache/*.php
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/app/private/*
+storage/pail
+public/hot
+public/storage
+
+# Control de versiones, editores y documentación (no se necesitan para ejecutar)
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+.claude
+Imagenes
+Explicacion
+Arquitectura
+tests
+*.md
+phpunit.xml
+
+# Se conserva 'Base de Datos/script.sql': la migración inicial y el seeder lo leen.

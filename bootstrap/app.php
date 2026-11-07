@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Autenticación SPA por cookie de sesión (Sanctum).
         $middleware->statefulApi();
 
+        // Detrás del proxy de Railway y del frontend (Caddy): se confía en sus
+        // cabeceras X-Forwarded-* para saber que la petición original fue HTTPS
+        // (cookies 'secure', URLs correctas). El contenedor no es accesible de otra forma.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'permiso' => VerificarPermiso::class,
         ]);

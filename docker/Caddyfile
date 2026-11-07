@@ -1,0 +1,19 @@
+# Servidor web de la API (FrankenPHP). HTTP plano: Railway termina el HTTPS delante.
+{
+	frankenphp
+	auto_https off
+	admin off
+}
+
+:{$PORT:8080} {
+	root * /app/public
+	encode zstd gzip
+
+	# Laravel: archivos de public/ y todo lo demás a index.php
+	php_server
+
+	log {
+		output stderr
+		format console
+	}
+}

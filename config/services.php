@@ -45,4 +45,17 @@ return [
         'timeout' => (float) env('ANTHROPIC_TIMEOUT', 20),
     ],
 
+    /*
+    | CU24 – Pasarela de pago Stripe. La clave secreta nunca sale del servidor;
+    | la pública la entrega GET /api/pagos/stripe/configuracion al frontend.
+    | Sin webhook_secret, el pago se confirma cuando el frontend vuelve del formulario.
+    */
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET_KEY'),
+        'publicable' => env('STRIPE_PUBLISHABLE_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'moneda' => strtolower(env('STRIPE_MONEDA', 'bob')),
+        'timeout' => (int) env('STRIPE_TIMEOUT', 20),
+    ],
+
 ];

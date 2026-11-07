@@ -794,3 +794,110 @@ El usuario **pide un reporte con sus palabras**, dictándolo con el micrófono o
 - **CU21:** reutiliza `CatalogoReportes` (lista blanca), `ReporteService::generar()`, `AlcanceReportes` y, en pantalla, `ReporteDocumento`, la exportación CSV y la versión imprimible.  
 - **CU06:** las consultas por voz aparecen en la bitácora.  
 - **Anthropic (opcional):** `ANTHROPIC_API_KEY` en `.env` activa la IA; cada consulta tiene costo según el uso de la API.
+
+---
+
+## CU24 (ampliación) – Pago con Tarjeta mediante Stripe  
+**Actor:** Paciente (P); Recepcionista (R) y Administrador (A) con `citas_programar`  
+**Prioridad:** Alta  
+**Módulo:** Módulo 4 – Operación de Citas y Pasarela de Pago (`ModuloOperacionCitas`)  
+**Permiso requerido:** sesión iniciada; el Paciente paga **sus** citas y el personal con `citas_programar`, cualquiera
+
+### Descripción funcional
+El método **Tarjeta de Crédito / Débito** deja de ser una demostración: se cobra de verdad con **Stripe**, en bolivianos (BOB). El formulario de tarjeta de Stripe (Payment Element) aparece dentro del paso **Pago** de la reserva en línea; los datos de la tarjeta van del navegador directamente a Stripe y la API nunca los recibe. QR, transferencia y efectivo siguen igual, pero ahora quedan **pendientes** hasta que el personal los verifique.
+
+**Reglas de negocio:**
+- **RN01 – Monto fijado por el servidor:** se cobra el `precio_consulta` de una especialidad activa que ejerza el médico de la cita. El navegador solo indica la especialidad; nunca el monto.
+- **RN02 – Estado verificado en Stripe:** el pago pasa a `Completado` solo cuando el servidor consulta el PaymentIntent en Stripe y su estado es `succeeded`. También se comprueba que el intento sea de esa cita y por ese monto y moneda; si no, responde **409**.
+- **RN03 – Un cobro por cita:** la cita se bloquea mientras se prepara el cobro. Si ya hay un intento pendiente por el mismo monto, se reutiliza; si cambió el precio, el intento anterior se anula. Una cita pagada no admite otro cobro.
+- **RN04 – Cambio de método:** si el paciente pasa de tarjeta a otro método, el intento de Stripe se anula. Si en ese momento ya estaba cobrado, se registra como pagado y no se cambia.
+- **RN05 – Pagos sin pasarela:** `POST /api/pagos` rechaza el método con pasarela ("se realiza en línea con Stripe"). Cuando el paciente registra QR, transferencia o efectivo, el pago queda siempre `Pendiente` y solo para sus citas. El personal registra pagos verificados.
+- **RN06 – Webhook de respaldo:** si el paciente cierra la pestaña después de pagar, Stripe avisa por `POST /api/stripe/webhook`. Solo se aceptan eventos con firma válida (`STRIPE_WEBHOOK_SECRET`), y el servidor vuelve a consultar el intento en lugar de confiar en el cuerpo del evento.
+- **RN07 – Sin redirecciones:** solo se ofrecen métodos que no salen de la página, es decir, tarjeta (`allow_redirects: never`). Si el banco pide 3-D Secure, se resuelve en una ventana de Stripe.
+- **RN08 – Auditoría:** cada creación y cada cambio de estado del pago se registra en `bitacora` (`pago_cita`). Volver a abrir el mismo intento no se registra.
+
+### Flujo principal (mínimo viable)
+1. El paciente agenda su cita en la página principal y llega al paso **Pago**.
+2. Elige **Tarjeta de Crédito / Débito**. El sistema crea el cobro (RN01) y muestra el formulario de Stripe con el estilo del sistema.
+3. El paciente escribe su tarjeta y pulsa **Pagar Bs …**. Stripe procesa el cobro y, si hace falta, pide 3-D Secure.
+4. El frontend pide al servidor que confirme el pago; el servidor lo verifica en Stripe (RN02) y lo marca `Completado`.
+5. El comprobante muestra la tarjeta (por ejemplo, "Visa •••• 4242"), el estado **Pagado** y el enlace al recibo de Stripe.
+
+### Flujos alternativos y excepciones
+| Código | Situación | Respuesta del sistema |
+|--------|-----------|-----------------------|
+| E1 | Tarjeta rechazada o fondos insuficientes | Stripe muestra el motivo en el formulario. El pago sigue `Pendiente` con `ultimo_error` y se puede reintentar con otra tarjeta |
+| E2 | Especialidad que el médico de la cita no atiende | **422** en `id_especialidad` |
+| E3 | Cita de otro paciente | **403** |
+| E4 | Cita ya pagada | **422** "Esta cita ya está pagada". Si se cobró pero no se había confirmado, se registra y se devuelve como pagada |
+| E5 | Cita cancelada, atendida o con inasistencia | **422** |
+| E6 | Stripe sin configurar | **503**; el método de tarjeta no se lista |
+| E7 | Stripe no responde o rechaza la solicitud | **502** con mensaje genérico; el detalle va al log |
+| E8 | Webhook sin firma válida o sin `STRIPE_WEBHOOK_SECRET` | **400** / **503** |
+| E9 | Más de 20 preparaciones de cobro por minuto | **429** |
+
+### Endpoints (API REST)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/pagos/stripe/configuracion` | `{ habilitado, clave_publica, moneda }`: la clave pública para cargar Stripe.js |
+| POST | `/api/citas/{cita}/pago-en-linea` | `{ id_especialidad }` → `{ pago, client_secret }`. `client_secret` es null si la cita ya estaba pagada |
+| POST | `/api/citas/{cita}/pago-en-linea/confirmar` | Consulta el intento en Stripe y devuelve el pago con su estado real |
+| POST | `/api/stripe/webhook` | Sin sesión; requiere firma de Stripe. Atiende `payment_intent.succeeded`, `payment_failed`, `canceled` y `processing` |
+| GET | `/api/metodos-pago` | Ahora incluye `en_linea` |
+| POST | `/api/pagos` | Ahora devuelve `PagoResource` y aplica RN05 |
+
+### Componentes de implementación
+- **Backend (`app/Modules/ModuloOperacionCitas`):**
+  - `Services/PasarelaStripe.php`: el único punto que habla con Stripe (SDK `stripe/stripe-php` ^22). Convierte bolivianos a centavos, hace 2 reintentos de red y traduce los errores a 502 o 503 sin exponer detalles de Stripe.
+  - `Services/PagoStripeService.php`: iniciar, confirmar, liberar un pago pendiente y sincronizar desde el webhook. Aplica el estado de forma idempotente.
+  - `Controllers/PagoStripeController.php` y `Controllers/StripeWebhookController.php`.
+  - `Requests/IniciarPagoEnLineaRequest.php` y `Resources/PagoResource.php`: el recurso expone la marca, los últimos 4 dígitos y el recibo, nunca identificadores internos de Stripe.
+  - Cambios en `PagoService` (RN05) y `MetodoPagoController` (`en_linea`).
+- **Migración** `2026_11_07_000000_agregar_pasarela_metodo_pago.php`: agrega `metodo_pago.pasarela` (`'stripe'` para el método de tarjeta).
+- **Configuración:** `config/services.php` → `stripe`. En `.env`: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` (opcional) y `STRIPE_MONEDA` (`bob`).
+- **Frontend:**
+  - `ModuloOperacionCitas/components/PagoConTarjeta.jsx`: usa `@stripe/react-stripe-js` y `@stripe/stripe-js`, con apariencia monocromo, Inter y solo tarjeta (sin Link ni billeteras).
+  - `services/pago.service.js`.
+  - `SitioPublico/reserva/PasoPago.jsx` y `ReservaConfirmada.jsx` (tarjeta, estado y recibo).
+  - `RegistrarPagoPage` carga los métodos de la API y no ofrece el de tarjeta.
+
+**Estado: implementado y probado en modo de prueba de Stripe (cuenta de España, cobro en BOB).**
+- **Por API:**
+  - configuración y métodos;
+  - E2, E3 y E4;
+  - tarjeta registrada a mano (rechazada);
+  - reutilización del intento;
+  - tarjeta rechazada (`pm_card_chargeDeclined`) y después una Visa aceptada;
+  - confirmación repetida (idempotente);
+  - paso de tarjeta a efectivo: el intento quedó `canceled` y el paciente no pudo marcar el pago como `Completado`;
+  - auditoría en `bitacora`.
+- **Webhook:**
+  - con firma válida, usando un secreto temporal en el proceso: el pago se completó solo por el aviso, con una Mastercard;
+  - con firma falsa: **400**;
+  - sin secreto: **503**.
+- **En Chrome real (sin interfaz):** reserva completa desde la página principal, la tarjeta 4242 escrita en el iframe de Stripe y el comprobante "Visa •••• 4242 · Pagado · Ver recibo".
+
+**Para producción:**
+- Usar claves `sk_live_`/`pk_live_`.
+- Registrar el webhook en Stripe (Desarrolladores → Webhooks → `https://<dominio>/api/stripe/webhook`) y copiar su `whsec_` en `STRIPE_WEBHOOK_SECRET`.
+- En desarrollo, el webhook se puede probar con `stripe listen --forward-to localhost:8000/api/stripe/webhook`.
+
+### Funcionalidades extras
+- Reembolsos desde el panel (estado `Reembolsado`) al cancelar una cita pagada.
+- Botón **Pagar** en "Mis citas" para pagar más tarde una cita pendiente.
+- QR boliviano real mediante otra pasarela, usando la misma columna `pasarela`.
+
+### Tablas implicadas
+| Tabla | Operación | Motivo |
+|-------|-----------|--------|
+| `pago_cita` | Inserción / Actualización | Pago pendiente con el PaymentIntent (`codigo_transaccion`) y `detalles_pasarela` (estado de Stripe, tarjeta, recibo, último error) |
+| `metodo_pago` | Lectura / Alteración | Nueva columna `pasarela` |
+| `cita_medica`, `medico_especialidad`, `especialidad` | Lectura | Cita cobrable y precio (RN01) |
+| `bitacora` | Inserción | Auditoría (RN08) |
+
+### Dependencias y conexiones
+- **CU13:** el pago sigue a la reserva en línea.  
+- **CU07:** el precio sale de `especialidad.precio_consulta`.  
+- **CU21/CU23:** los reportes de ingresos ya cuentan los pagos `Completado`, también los de Stripe.  
+- **CU06:** los cambios de estado del pago aparecen en la bitácora.  
+- **Stripe:** servicio externo. Sin claves, la clínica sigue funcionando con los métodos verificados a mano.

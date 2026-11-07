@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Modules\ModuloOperacionCitas\Models\MetodoPago;
 use App\Modules\ModuloPersonalMedico\Models\Especialidad;
 use App\Modules\ModuloSeguridad\Models\Rol;
 use App\Shared\Support\ScriptSqlClinico;
@@ -43,6 +44,9 @@ class DatabaseSeeder extends Seeder
             foreach (Especialidad::PRECIOS_INICIALES as $nombre => $precio) {
                 DB::table('especialidad')->where('nombre', $nombre)->update(['precio_consulta' => $precio]);
             }
+
+            // Ni la pasarela del método de tarjeta (Stripe): la migración corre antes de este seeder.
+            MetodoPago::asignarPasarelas();
 
             // El hash escrito en el script no es un BCRYPT válido (59 caracteres),
             // por lo que se regenera con el hasher de Laravel.

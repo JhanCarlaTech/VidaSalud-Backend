@@ -8,9 +8,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Table(name: 'pago_cita', timestamps: false)]
-#[Fillable(['id_cita', 'id_metodo_pago', 'codigo_transaccion', 'monto', 'moneda', 'estado', 'detalles_pasarela'])]
+#[Fillable(['id_cita', 'id_metodo_pago', 'codigo_transaccion', 'monto', 'moneda', 'estado', 'fecha_pago', 'detalles_pasarela'])]
 class PagoCita extends Model
 {
+    public const PENDIENTE = 'Pendiente';
+
+    public const COMPLETADO = 'Completado';
+
+    public const RECHAZADO = 'Rechazado';
+
+    public const REEMBOLSADO = 'Reembolsado';
+
+    public const ESTADOS = [self::PENDIENTE, self::COMPLETADO, self::RECHAZADO, self::REEMBOLSADO];
+
     protected function casts(): array
     {
         return [

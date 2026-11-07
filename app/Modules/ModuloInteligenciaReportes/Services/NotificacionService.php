@@ -3,6 +3,7 @@
 namespace App\Modules\ModuloInteligenciaReportes\Services;
 
 use App\Modules\ModuloInteligenciaReportes\Jobs\EnviarCorreoNotificacion;
+use App\Modules\ModuloInteligenciaReportes\Jobs\EnviarPushNotificacion;
 use App\Modules\ModuloInteligenciaReportes\Models\Notificacion;
 use App\Modules\ModuloOperacionCitas\Models\CitaMedica;
 use App\Modules\ModuloPacientes\Models\Paciente;
@@ -81,7 +82,10 @@ class NotificacionService
             foreach ($citas as $cita) {
                 $notificacion = $this->notificarCita($cita, Notificacion::RECORDATORIO);
                 // Tras confirmar la transacción, para que el correo vea la notificación guardada.
-                DB::afterCommit(fn () => EnviarCorreoNotificacion::dispatchSync($notificacion->id));
+                DB::afterCommit(function () use ($notificacion) {
+                    EnviarCorreoNotificacion::dispatchSync($notificacion->id);
+                    EnviarPushNotificacion::dispatchSync($notificacion->id);
+                });
             }
 
             return $citas->count();
@@ -221,6 +225,8 @@ class NotificacionService
             $enviarAhora
                 ? EnviarCorreoNotificacion::dispatchSync($notificacion->id)
                 : EnviarCorreoNotificacion::dispatchAfterResponse($notificacion->id);
+            // Push al dispositivo del paciente: nunca hace esperar la respuesta.
+            EnviarPushNotificacion::dispatchAfterResponse($notificacion->id);
         }
 
         return $notificacion;

@@ -18,6 +18,8 @@ class PagoRequest extends FormRequest
             'id_cita' => ['required', 'integer', 'exists:cita_medica,id'],
             'id_metodo_pago' => ['required', 'integer', 'exists:metodo_pago,id'],
             'monto' => ['required', 'numeric', 'min:0'],
+            // Pago del paciente desde "Mis citas" en citas antiguas sin especialidad guardada.
+            'id_especialidad' => ['nullable', 'integer', 'exists:especialidad,id'],
             'codigo_transaccion' => ['nullable', 'string', 'max:100', 'unique:pago_cita,codigo_transaccion'],
             'detalles_pasarela' => ['nullable', 'array'], // Aquí se guarda la respuesta del banco (JSON)
             'estado' => ['nullable', Rule::in(['Pendiente', 'Completado', 'Rechazado', 'Reembolsado'])],

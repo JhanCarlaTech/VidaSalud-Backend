@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Modules\ModuloOperacionCitas\Models\CitaMedica
+ * @mixin CitaMedica
  */
 class CitaResource extends JsonResource
 {
@@ -28,6 +28,18 @@ class CitaResource extends JsonResource
             'pendiente' => in_array($this->estado, CitaMedica::ESTADOS_MODIFICABLES, true),
             'motivo' => $this->motivo,
             'motivo_cancelacion' => $this->motivo_cancelacion,
+            // CU24: especialidad reservada (precio) y estado del pago.
+            'especialidad' => $this->whenLoaded('especialidad', fn () => $this->especialidad ? [
+                'id' => $this->especialidad->id,
+                'nombre' => $this->especialidad->nombre,
+                'precio_consulta' => (float) $this->especialidad->precio_consulta,
+            ] : null),
+            'pago' => $this->whenLoaded('pago', fn () => $this->pago ? [
+                'estado' => $this->pago->estado,
+                'metodo' => $this->pago->metodoPago?->nombre,
+                'en_linea' => (bool) $this->pago->metodoPago?->esEnLinea(),
+                'monto' => (float) $this->pago->monto,
+            ] : null),
             'modalidad' => $this->whenLoaded('modalidad', fn () => [
                 'id' => $this->modalidad->id,
                 'nombre' => $this->modalidad->nombre,

@@ -110,6 +110,8 @@ class CitaService
                 'hra_fin' => $turno['hora_fin'], // RN02: la calcula el sistema.
                 'motivo' => $datos['motivo'],
                 'estado' => CitaMedica::PROGRAMADA,
+                // CU24: el precio de la consulta depende de la especialidad elegida.
+                'id_especialidad' => $datos['id_especialidad'],
             ]);
 
             $cita = $this->detalle($cita);

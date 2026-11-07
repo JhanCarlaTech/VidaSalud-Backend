@@ -5,7 +5,6 @@ namespace App\Modules\ModuloOperacionCitas\Services;
 use App\Modules\ModuloOperacionCitas\Models\CitaMedica;
 use App\Modules\ModuloOperacionCitas\Models\MetodoPago;
 use App\Modules\ModuloOperacionCitas\Models\PagoCita;
-use App\Modules\ModuloPersonalMedico\Models\Especialidad;
 use App\Modules\ModuloSeguridad\Services\BitacoraService;
 use App\Shared\Http\ApiResponse;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -34,6 +33,7 @@ class PagoStripeService
     public function __construct(
         private readonly PasarelaStripe $stripe,
         private readonly BitacoraService $bitacora,
+        private readonly PrecioCitaService $precios,
     ) {}
 
     /**
@@ -43,10 +43,10 @@ class PagoStripeService
      *
      * @throws ValidationException
      */
-    public function iniciar(CitaMedica $cita, int $idEspecialidad, int $idUsuario): array
+    public function iniciar(CitaMedica $cita, ?int $idEspecialidad, int $idUsuario): array
     {
         $metodo = $this->metodoStripe();
-        $especialidad = $this->especialidadDeLaCita($cita, $idEspecialidad);
+        $especialidad = $this->precios->resolver($cita, $idEspecialidad);
         $monto = (string) $especialidad->precio_consulta;
         $centavos = PasarelaStripe::aCentavos($monto);
 
@@ -279,21 +279,6 @@ class PagoStripeService
         }
 
         return $metodo;
-    }
-
-    /** RN: se cobra el precio de una especialidad activa que ejerza el médico de la cita. */
-    private function especialidadDeLaCita(CitaMedica $cita, int $idEspecialidad): Especialidad
-    {
-        $especialidad = $cita->medico?->especialidades()
-            ->where('especialidad.id', $idEspecialidad)
-            ->where('especialidad.activo', true)
-            ->first();
-
-        if (! $especialidad) {
-            throw ValidationException::withMessages(['id_especialidad' => 'El médico de la cita no atiende esa especialidad.']);
-        }
-
-        return $especialidad;
     }
 
     private function validarCitaCobrable(CitaMedica $cita): void

@@ -7,7 +7,7 @@
 FROM dunglas/frankenphp:1-php8.5
 
 # Extensiones: PostgreSQL, y las que exige el código (fileinfo y curl ya vienen con PHP).
-RUN install-php-extensions pdo_pgsql pgsql intl zip bcmath opcache pcntl \
+RUN install-php-extensions pdo_pgsql pgsql intl zip bcmath gmp opcache pcntl \
     && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*

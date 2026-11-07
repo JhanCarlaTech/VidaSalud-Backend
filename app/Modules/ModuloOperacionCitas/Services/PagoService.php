@@ -20,6 +20,7 @@ class PagoService
     public function __construct(
         private readonly BitacoraService $bitacora,
         private readonly PagoStripeService $pagosStripe,
+        private readonly PrecioCitaService $precios,
     ) {}
 
     /**
@@ -38,8 +39,15 @@ class PagoService
         }
 
         $cita = CitaMedica::query()->findOrFail($datos['id_cita']);
-        if (! $esPersonal && (int) $cita->id_paciente !== (int) $actor->id) {
-            throw new AccessDeniedHttpException;
+        if (! $esPersonal) {
+            if ((int) $cita->id_paciente !== (int) $actor->id) {
+                throw new AccessDeniedHttpException;
+            }
+            if (! in_array($cita->estado, CitaMedica::ESTADOS_PENDIENTES, true)) {
+                throw ValidationException::withMessages(['id_cita' => "No se puede pagar una cita en estado {$cita->estado}."]);
+            }
+            // El paciente no fija el monto: es el precio de la especialidad de la cita.
+            $datos['monto'] = (string) $this->precios->resolver($cita, $datos['id_especialidad'] ?? null)->precio_consulta;
         }
 
         // Un cobro con tarjeta a medio hacer se anula antes de elegir otro método.

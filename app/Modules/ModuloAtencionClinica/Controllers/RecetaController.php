@@ -8,9 +8,11 @@ use App\Modules\ModuloAtencionClinica\Models\RecetaMedica;
 use App\Modules\ModuloAtencionClinica\Requests\RecetaRequest;
 use App\Modules\ModuloAtencionClinica\Resources\RecetaResource;
 use App\Modules\ModuloAtencionClinica\Services\RecetaService;
+use App\Modules\ModuloPacientes\Models\Paciente;
 use App\Shared\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * CU18 – Emitir Receta Médica.
@@ -59,6 +61,34 @@ class RecetaController extends Controller
             ],
             'dias_para_emitir' => RecetaService::DIAS_PARA_EMITIR,
         ], 'Consultas atendidas.');
+    }
+
+    /**
+     * GET /api/mis-recetas?buscar=&page=: recetas del paciente autenticado (CU18).
+     */
+    public function misRecetas(Request $request): JsonResponse
+    {
+        $request->validate(['buscar' => ['nullable', 'string', 'max:100']]);
+
+        if (! Paciente::query()->whereKey($request->user()->id)->exists()) {
+            throw new AccessDeniedHttpException;
+        }
+
+        $pagina = $this->recetas->delPaciente(
+            $request->user()->id,
+            $request->filled('buscar') ? trim($request->input('buscar')) : null,
+            self::POR_PAGINA,
+        );
+
+        return ApiResponse::exito([
+            'items' => RecetaResource::collection($pagina->items()),
+            'meta' => [
+                'pagina_actual' => $pagina->currentPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'por_pagina' => $pagina->perPage(),
+                'total' => $pagina->total(),
+            ],
+        ], 'Mis recetas.');
     }
 
     /**

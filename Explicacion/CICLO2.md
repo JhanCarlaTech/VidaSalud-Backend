@@ -901,3 +901,82 @@ El método **Tarjeta de Crédito / Débito** deja de ser una demostración: se c
 - **CU21/CU23:** los reportes de ingresos ya cuentan los pagos `Completado`, también los de Stripe.  
 - **CU06:** los cambios de estado del pago aparecen en la bitácora.  
 - **Stripe:** servicio externo. Sin claves, la clínica sigue funcionando con los métodos verificados a mano.
+
+---
+
+## CU20 (ampliación) – Notificaciones Push al Dispositivo  
+**Actor:** Paciente (P)  
+**Módulo:** Módulo 6 – `ModuloInteligenciaReportes`  
+**Permiso requerido:** sesión iniciada (cada usuario gestiona sus propios dispositivos)
+
+### Descripción funcional
+Cada notificación de CU20 (cita agendada, reprogramada o cancelada, recordatorio, aviso de la clínica) llega también como **aviso del sistema operativo** al celular o la computadora del paciente, aunque la página esté cerrada. Se usa el estándar **Web Push con claves VAPID**: el navegador se suscribe al servicio push de su fabricante (Google, Mozilla o Apple) y el servidor envía cada aviso cifrado para ese navegador.
+
+**Reglas de negocio:**
+- **RN01 – Por dispositivo:** se activa por separado en cada dispositivo, desde **Notificaciones → Activar avisos**, y requiere el permiso del navegador.
+- **RN02 – Preferencia:** se respeta `preferencia_notificacion.notificar_push` (en Mi perfil). El aviso de prueba la ignora.
+- **RN03 – Limpieza:** si el servicio push responde 404 o 410 (permiso revocado o navegador desinstalado), la suscripción se elimina y queda registrada en el log.
+- **RN04 – Cierre de sesión:** al cerrar sesión el dispositivo se desvincula. Al volver a entrar, se vincula a la cuenta que inició sesión, porque una misma computadora puede ser compartida.
+- **RN05 – No bloquea:** el push se envía después de responder. Un fallo nunca afecta a agendar o cancelar.
+- **RN06 – iPhone:** solo funciona con la web instalada en la pantalla de inicio (iOS 16.4 o posterior). El panel lo explica.
+
+### Endpoints (API REST)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/push/configuracion` | `{ habilitado, clave_publica, dispositivos }` |
+| POST | `/api/push/suscripciones` | Suscripción del navegador (`PushSubscription.toJSON()` + `content_encoding`) |
+| DELETE | `/api/push/suscripciones` | `{ endpoint }`: desactiva este dispositivo |
+| POST | `/api/push/prueba` | Aviso de prueba a los dispositivos del propio usuario (5 por minuto) |
+
+### Componentes de implementación
+- **Backend:**
+  - Paquete `minishlink/web-push` ^11.
+  - Tabla `suscripcion_push`: migración `2026_11_08_000000` y modelo `SuscripcionPush`.
+  - `Services/PushService.php`, `Jobs/EnviarPushNotificacion.php`, `Controllers/PushController.php` y `Requests/SuscripcionPushRequest.php`.
+  - `NotificacionService` lo invoca en `crear()` y en `enviarRecordatorios()`.
+  - Comando `php artisan push:claves`, que genera las claves VAPID una sola vez.
+  - Configuración `services.webpush`: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT`.
+- **Frontend:**
+  - `public/sw.js` (service worker: mostrar el aviso y abrir la bandeja al tocarlo).
+  - `public/manifest.webmanifest` e íconos en `public/icons/`, para que la web sea instalable (iPhone).
+  - `services/push.service.js`, `hooks/usePush.js` y `components/PanelPush.jsx` en la página de notificaciones.
+  - Desvinculación al cerrar sesión, en `AuthContext`.
+
+**Estado: implementado y probado.**
+- **En Chrome real:** activación (permiso, service worker y suscripción guardada), aviso de prueba y aviso enviado por el administrador. El servicio push de Google respondió **201 (entregado)** a cada dispositivo.
+
+**Desarrollo en Windows:** el PHP local necesita `OPENSSL_CONF` apuntando a un `openssl.cnf` (por ejemplo, el de Git) para generar las claves y cifrar los avisos, y `WEBPUSH_CA_BUNDLE` para los certificados. En Docker y Railway (Linux) no hace falta.
+
+---
+
+## Ajustes: pagar desde "Mis citas" (CU24) y "Mis recetas" (CU18)
+
+### Pagar una cita ya reservada
+- **Pagar Cita sale del menú del paciente.** Esa pantalla permitía escribir cualquier ID de cita y monto. Ahora el registro manual de pagos verificados es solo del personal (Administración y Recepción).
+- **En "Mis citas"** cada cita muestra su estado de pago: Pagado, Pago pendiente de verificación, Pago con tarjeta sin completar o Sin pagar. Las citas pendientes no pagadas tienen el botón **Pagar**, también a menos de 24 horas, cuando ya no se pueden reprogramar. El pago es el mismo de la reserva en línea (componente `PagoCita`): tarjeta con Stripe, o QR, transferencia o efectivo como pago pendiente.
+- **La cita guarda su especialidad** (`cita_medica.id_especialidad`, migración `2026_11_09_000000`), porque el precio depende de ella y un médico puede tener varias:
+  - las citas nuevas la guardan al reservarse;
+  - las existentes se completaron cuando el médico tiene una sola especialidad o un pago con tarjeta ya la registró;
+  - en el resto, el paciente la elige al pagar y queda guardada.
+- **El servidor fija el monto** también en los pagos manuales del paciente (`PrecioCitaService`); el monto que envía el navegador se ignora. Una especialidad ya guardada no se puede cambiar al pagar.
+- **API:**
+  - nuevo `GET /api/citas/{cita}/pago` → `{ pago, cobrable, especialidades }`;
+  - `CitaResource` ahora incluye `especialidad` y `pago`;
+  - `id_especialidad` es opcional en `POST /api/citas/{cita}/pago-en-linea` y en `POST /api/pagos`.
+
+### Mis recetas (Paciente)
+- **Nueva página** en *Atención clínica → Mis recetas* (`/paciente/recetas`): todas las recetas del paciente con médico, fecha, medicamentos (dosis, frecuencia y duración) e indicaciones, más el botón **Ver e imprimir** (versión imprimible de CU18). Se puede buscar por medicamento, médico o código de cita, con paginación.
+- **API:** `GET /api/mis-recetas?buscar=&page=`, solo para el propio paciente (`RecetaService::delPaciente`).
+
+**Probado:**
+- **Por API:**
+  - estado de pago en "Mis citas";
+  - especialidad obligatoria en una cita antigua;
+  - monto fijado por el servidor (se envió Bs 1 y se registró Bs 150);
+  - especialidad bloqueada después;
+  - 17 recetas del paciente.
+- **En Chrome:**
+  - el menú sin "Pagar Cita";
+  - pago con tarjeta desde "Mis citas" eligiendo Ginecología: Bs 180, cita marcada como Pagado;
+  - "Mis recetas";
+  - regresión de la reserva con pago desde la página principal.

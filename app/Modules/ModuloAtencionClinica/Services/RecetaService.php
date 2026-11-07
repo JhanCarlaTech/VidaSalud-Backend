@@ -131,6 +131,27 @@ class RecetaService
      *
      * @throws AccessDeniedHttpException
      */
+    /**
+     * "Mis recetas" del paciente: todas las emitidas en sus consultas, la más reciente
+     * primero. Se puede buscar por medicamento, médico o código de cita.
+     */
+    public function delPaciente(int $idPaciente, ?string $buscar, int $porPagina): LengthAwarePaginator
+    {
+        return RecetaMedica::query()
+            ->with(self::RELACIONES_RECETA)
+            ->whereHas('consulta.cita', fn (Builder $cita) => $cita->where('id_paciente', $idPaciente))
+            ->when($buscar, function (Builder $query, string $termino) {
+                $patron = '%'.addcslashes($termino, '%_\\').'%';
+                $query->where(fn (Builder $o) => $o
+                    ->whereHas('detalles', fn (Builder $d) => $d->where('medicamento', 'ilike', $patron))
+                    ->orWhereHas('consulta.cita', fn (Builder $c) => $c->where('codigo_cita', 'ilike', $patron)
+                        ->orWhereHas('medico.usuario', fn (Builder $u) => $u->whereRaw("(nombre || ' ' || apellido) ilike ?", [$patron]))));
+            })
+            ->orderByDesc('fecha_emision')
+            ->orderByDesc('id')
+            ->paginate($porPagina);
+    }
+
     public function detalle(RecetaMedica $receta, Usuario $usuario): RecetaMedica
     {
         $receta->load(self::RELACIONES_RECETA);

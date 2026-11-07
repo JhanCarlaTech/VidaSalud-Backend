@@ -50,6 +50,7 @@ Route::get('metodos-pago', [MetodoPagoController::class, 'index'])->middleware([
 // CU24 – Pago con tarjeta mediante Stripe. Quién paga qué cita lo decide PagoStripeController.
 Route::middleware(['auth:sanctum'])->whereNumber('cita')->group(function () {
     Route::get('pagos/stripe/configuracion', [PagoStripeController::class, 'configuracion']);
+    Route::get('citas/{cita}/pago', [PagoStripeController::class, 'contexto']);
     Route::post('citas/{cita}/pago-en-linea', [PagoStripeController::class, 'iniciar'])->middleware('throttle:20,1');
     Route::post('citas/{cita}/pago-en-linea/confirmar', [PagoStripeController::class, 'confirmar'])->middleware('throttle:30,1');
 });

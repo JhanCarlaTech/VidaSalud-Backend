@@ -7,6 +7,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
+use Minishlink\WebPush\VAPID;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -23,6 +24,19 @@ Artisan::command('notificaciones:recordatorios', function (NotificacionService $
 })->purpose('Envía los recordatorios de las próximas citas según la anticipación de cada paciente');
 
 Schedule::command('notificaciones:recordatorios')->everyFifteenMinutes()->withoutOverlapping();
+
+/*
+| CU20 – Claves VAPID para las notificaciones push. Se generan UNA sola vez y se
+| guardan en el .env (y en Railway): si cambian, los dispositivos ya suscritos
+| dejan de recibir avisos hasta volver a activarlos.
+*/
+Artisan::command('push:claves', function () {
+    $claves = VAPID::createVapidKeys();
+    $this->line('Agregue estas líneas al .env (y a las variables del Backend en Railway):');
+    $this->newLine();
+    $this->line('VAPID_PUBLIC_KEY='.$claves['publicKey']);
+    $this->line('VAPID_PRIVATE_KEY='.$claves['privateKey']);
+})->purpose('Genera el par de claves VAPID para las notificaciones push');
 
 /*
 | Despliegue (docker/entrypoint.sh): con la base vacía carga los datos iniciales

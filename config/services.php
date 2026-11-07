@@ -58,4 +58,19 @@ return [
         'timeout' => (int) env('STRIPE_TIMEOUT', 20),
     ],
 
+    /*
+    | CU20 – Notificaciones push (Web Push con claves VAPID).
+    | Genere las claves una sola vez con 'php artisan push:claves'. Si se cambian,
+    | todas las suscripciones existentes dejan de funcionar.
+    | 'asunto': contacto para los servicios push (mailto: o https://).
+    | 'ca_bundle': solo para PHP sin certificados raíz (desarrollo en Windows).
+    */
+    'webpush' => [
+        'publica' => env('VAPID_PUBLIC_KEY'),
+        'privada' => env('VAPID_PRIVATE_KEY'),
+        'asunto' => env('VAPID_SUBJECT', 'mailto:'.env('MAIL_FROM_ADDRESS', 'contacto@vidasalud.com')),
+        'ttl' => (int) env('WEBPUSH_TTL', 86400), // segundos que el servicio guarda el aviso si el dispositivo está apagado
+        'ca_bundle' => env('WEBPUSH_CA_BUNDLE'),
+    ],
+
 ];

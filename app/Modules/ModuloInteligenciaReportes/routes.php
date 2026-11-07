@@ -4,6 +4,7 @@ use App\Modules\ModuloInteligenciaReportes\Controllers\ConsultaVozController;
 use App\Modules\ModuloInteligenciaReportes\Controllers\DashboardController;
 use App\Modules\ModuloInteligenciaReportes\Controllers\MisNotificacionesController;
 use App\Modules\ModuloInteligenciaReportes\Controllers\NotificacionController;
+use App\Modules\ModuloInteligenciaReportes\Controllers\PushController;
 use App\Modules\ModuloInteligenciaReportes\Controllers\ReporteController;
 use App\Modules\ModuloInteligenciaReportes\Services\CatalogoReportes;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,14 @@ Route::prefix('mis-notificaciones')->middleware('auth:sanctum')->whereNumber('no
     Route::get('resumen', [MisNotificacionesController::class, 'resumen']);
     Route::patch('leer-todas', [MisNotificacionesController::class, 'marcarTodas']);
     Route::patch('{notificacion}/leida', [MisNotificacionesController::class, 'marcarLeida']);
+});
+
+// CU20 – Notificaciones push: cada usuario gestiona sus propios dispositivos
+Route::prefix('push')->middleware('auth:sanctum')->group(function () {
+    Route::get('configuracion', [PushController::class, 'configuracion']);
+    Route::post('suscripciones', [PushController::class, 'suscribir'])->middleware('throttle:20,1');
+    Route::delete('suscripciones', [PushController::class, 'desuscribir']);
+    Route::post('prueba', [PushController::class, 'prueba'])->middleware('throttle:5,1');
 });
 
 // CU21 – Reportes operativos (permiso del script 'reportes_ver'; el alcance lo resuelve ReporteController)

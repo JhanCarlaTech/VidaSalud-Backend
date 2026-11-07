@@ -3,6 +3,7 @@
 namespace App\Modules\ModuloOperacionCitas\Models;
 
 use App\Modules\ModuloPacientes\Models\Paciente;
+use App\Modules\ModuloPersonalMedico\Models\Especialidad;
 use App\Modules\ModuloPersonalMedico\Models\Medico;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -10,12 +11,13 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Cita médica (tabla 'cita_medica', CU13–CU17).
  */
 #[Table(name: 'cita_medica', timestamps: false)]
-#[Fillable(['codigo_cita', 'id_paciente', 'id_medico', 'id_modalidad', 'fecha', 'hra_inicio', 'hra_fin', 'motivo', 'estado', 'motivo_cancelacion'])]
+#[Fillable(['codigo_cita', 'id_paciente', 'id_medico', 'id_modalidad', 'fecha', 'hra_inicio', 'hra_fin', 'motivo', 'estado', 'motivo_cancelacion', 'id_especialidad'])]
 class CitaMedica extends Model
 {
     /** Valores de 'estado_cita_enum'. */
@@ -66,15 +68,29 @@ class CitaMedica extends Model
         return $this->belongsTo(ModalidadCita::class, 'id_modalidad');
     }
 
+    /** Especialidad con la que se reservó (define el precio). Null en citas antiguas ambiguas. */
+    public function especialidad(): BelongsTo
+    {
+        return $this->belongsTo(Especialidad::class, 'id_especialidad');
+    }
+
+    /** Pago de la cita (CU24): uno por cita. */
+    public function pago(): HasOne
+    {
+        return $this->hasOne(PagoCita::class, 'id_cita');
+    }
+
     /**
      * Relaciones que muestran las pantallas de citas (paciente, médico con sus
-     * especialidades y días de atención, y modalidad).
+     * especialidades y días de atención, modalidad, especialidad reservada y pago).
      */
     #[Scope]
     protected function conDetalle(Builder $query): void
     {
         $query->with([
             'modalidad',
+            'especialidad',
+            'pago.metodoPago',
             'paciente.usuario',
             'medico.usuario',
             'medico.especialidades' => fn ($especialidades) => $especialidades->orderBy('especialidad.nombre'),

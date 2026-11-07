@@ -84,6 +84,12 @@ MAIL_FROM_NAME="Clinica Vida Salud"
 # MAIL_USERNAME=<usuario>
 # MAIL_PASSWORD=<contraseña>
 
+# Notificaciones push (CU20). Use las MISMAS claves de su .env (php artisan push:claves).
+# Si las cambia, los dispositivos suscritos dejan de recibir avisos hasta reactivarlos.
+VAPID_PUBLIC_KEY=<clave pública>
+VAPID_PRIVATE_KEY=<clave privada>
+VAPID_SUBJECT=mailto:contacto@vidasalud.com
+
 # Opcionales
 CLINICA_NOMBRE="Clínica Vida Salud"
 CLINICA_DIRECCION="Av. Principal #123, Santa Cruz de la Sierra, Bolivia"
@@ -127,7 +133,14 @@ Abra `https://<dominio-del-frontend>` e inicie sesión con `ADMIN_CORREO` / `ADM
   Copie el *signing secret* (`whsec_...`) en `STRIPE_WEBHOOK_SECRET` del Backend. Sin webhook los pagos funcionan igual; el webhook solo cubre el caso en que el paciente cierra la pestaña justo después de pagar.
 - **Producción real:** cambie a las claves `sk_live_` y `pk_live_`.
 
-## 6. Verificación rápida
+## 6. Notificaciones push
+
+Funcionan en cuanto existen `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`; no hay que configurar nada más en Railway, porque el sitio ya se sirve con HTTPS, que es obligatorio para el push. Cada paciente las activa en **Notificaciones → Activar avisos**, una vez por dispositivo.
+
+- **Android, Windows, Mac y Linux** (Chrome, Edge, Firefox, Safari): funcionan directamente desde el navegador.
+- **iPhone y iPad** (iOS 16.4 o posterior): primero hay que instalar la web (*Compartir → Agregar a pantalla de inicio*), abrirla desde ese ícono y activar los avisos allí.
+
+## 7. Verificación rápida
 
 | Prueba | Resultado esperado |
 |---|---|
@@ -135,6 +148,7 @@ Abra `https://<dominio-del-frontend>` e inicie sesión con `ADMIN_CORREO` / `ADM
 | `https://<frontend>/api/publico/modalidades` | JSON con las modalidades |
 | Iniciar sesión como administrador | Entra al panel. Si vuelve al login, revise `SANCTUM_STATEFUL_DOMAINS` y `SESSION_SECURE_COOKIE` |
 | Reservar y pagar con `4242 4242 4242 4242` (modo prueba) | "Pagado · Ver recibo" |
+| Paciente → Notificaciones → Activar avisos → Enviar prueba | Llega un aviso del sistema operativo |
 | Logs del Backend | `Base vacía: datos iniciales...` (primera vez) o `permisos del sistema actualizados` |
 
 ## Problemas frecuentes
@@ -146,6 +160,7 @@ Abra `https://<dominio-del-frontend>` e inicie sesión con `ADMIN_CORREO` / `ADM
 | `502` en `/api/...` | El Backend no está listo o `BACKEND_URL` no coincide con el nombre del servicio o con el puerto 8080 |
 | Login devuelve 419 o vuelve al inicio | `SANCTUM_STATEFUL_DOMAINS` debe ser el dominio del frontend, sin `https://` |
 | No aparece el pago con tarjeta | Faltan `STRIPE_SECRET_KEY` o `STRIPE_PUBLISHABLE_KEY` |
+| "Las notificaciones al dispositivo no están disponibles" | Faltan `VAPID_PUBLIC_KEY` o `VAPID_PRIVATE_KEY` en el Backend |
 
 ## Probar las imágenes localmente (opcional, con Docker)
 

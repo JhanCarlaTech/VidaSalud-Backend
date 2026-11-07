@@ -30,5 +30,8 @@ Route::middleware(['auth:sanctum', 'permiso:historial_consultar'])->whereNumber(
 // CU19 – Mi historial: el propio paciente (sin permiso adicional, como "Mi ficha" de CU11).
 Route::get('mi-historial', [HistorialController::class, 'miHistorial'])->middleware('auth:sanctum');
 
+// CU18 – Mis recetas: el propio paciente (sin permiso adicional, como "Mi historial").
+Route::get('mis-recetas', [RecetaController::class, 'misRecetas'])->middleware('auth:sanctum');
+
 // CU18 – Ver o imprimir una receta: el médico que la emitió, el paciente o un médico que lo atiende (RN05).
 Route::get('recetas/{receta}', [RecetaController::class, 'show'])->middleware('auth:sanctum')->whereNumber('receta');
